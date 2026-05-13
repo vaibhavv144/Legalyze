@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic-settings
+motor
+PyJWT
+passlib[bcrypt]
+email-validator
+python-docx
+pypdf
+pillow
+httpx
+pytest
