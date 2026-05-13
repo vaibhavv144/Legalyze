@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-1.5-flash"
+    allowed_origins: str = "*"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
