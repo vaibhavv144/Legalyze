@@ -15,24 +15,26 @@ export function ChatBubble({
   return (
     <div className={`flex gap-3 ${isAssistant ? "justify-start" : "justify-end"}`}>
       {isAssistant ? (
-        <div className="h-8 w-8 rounded-full bg-blue-600/10 text-blue-600 grid place-items-center font-bold text-xs">AI</div>
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-[#0c0b0a] text-[11px] font-bold text-white">
+          AI
+        </div>
       ) : null}
       <div
-        className={`max-w-3xl rounded-2xl px-4 py-3 ${
+        className={`max-w-3xl rounded-xl px-4 py-3 ${
           isAssistant
-            ? "border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
-            : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
+            ? "border border-[#e8e6e1] bg-white text-[#3a3a37]"
+            : "bg-[#0c0b0a] text-white"
         }`}
       >
-        <div className="prose prose-sm max-w-none dark:prose-invert">
+        <div className="prose prose-sm max-w-none prose-headings:text-current prose-strong:text-current prose-p:text-current">
           <ReactMarkdown>{content}</ReactMarkdown>
         </div>
         {isAssistant && citations?.length ? (
-          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-700 dark:bg-slate-800">
-            <p className="mb-1 font-semibold">Citations</p>
+          <div className="mt-3 rounded-lg border border-[#eeece7] bg-[#fcfbf9] p-3 text-xs">
+            <p className="mb-1.5 font-mono uppercase tracking-[0.16em] text-[#a8a39a]">Citations</p>
             {citations.map((c, idx) => (
-              <p key={`${c.source}-${idx}`} className="text-slate-600 dark:text-slate-300">
-                {c.source}: {c.excerpt}
+              <p key={`${c.source}-${idx}`} className="text-[#6b665d]">
+                <span className="font-medium text-[#161513]">{c.source}:</span> {c.excerpt}
               </p>
             ))}
           </div>
@@ -42,17 +44,17 @@ export function ChatBubble({
             type="button"
             variant="ghost"
             size="sm"
-            className="mt-2"
+            className="mt-2 -ml-1.5 h-7 px-2 text-xs text-[#78736b]"
             onClick={() => navigator.clipboard.writeText(content)}
           >
-            <Copy className="mr-1 h-3 w-3" />
+            <Copy className="mr-1 h-3 w-3" strokeWidth={1.75} />
             Copy
           </Button>
         ) : null}
       </div>
       {!isAssistant ? (
-        <div className="h-8 w-8 rounded-full bg-slate-200 text-slate-700 grid place-items-center dark:bg-slate-700 dark:text-slate-100">
-          <UserRound className="h-4 w-4" />
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-[#e8e6e1] bg-white text-[#161513]">
+          <UserRound className="h-4 w-4" strokeWidth={1.75} />
         </div>
       ) : null}
     </div>

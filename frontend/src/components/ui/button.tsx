@@ -3,16 +3,15 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center rounded-md text-sm font-semibold antialiased transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-[#161513]/20 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        primary:
-          "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 hover:scale-[1.02] hover:shadow-blue-500/40",
+        primary: "bg-[#0c0b0a] text-white hover:bg-[#2f2c28]",
         secondary:
-          "bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-white dark:border-slate-700 dark:hover:bg-slate-800",
-        ghost: "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800",
-        danger: "bg-red-500 text-white hover:bg-red-600",
+          "border border-[#e8e6e1] bg-white text-[#161513] hover:border-[#d6d3cc] hover:bg-[#f6f4ef]",
+        ghost: "text-[#3a3a37] hover:bg-[#f1efea] hover:text-[#161513]",
+        danger: "bg-[#9f2f2d] text-white hover:bg-[#8a2826]",
       },
       size: {
         sm: "h-9 px-3",

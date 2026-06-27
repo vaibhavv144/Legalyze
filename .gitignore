@@ -84,3 +84,6 @@ $RECYCLE.BIN/
 # Cursor / agent transcripts (local only)
 # ─────────────────────────────────────────────
 .cursor/
+
+.agents/
+skills-lock.json

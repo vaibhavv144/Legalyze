@@ -1,17 +1,21 @@
-import { AlertTriangle } from "lucide-react";
 import { cn } from "../lib/utils";
 
-export function RiskBadge({ severity }: { severity: "low" | "medium" | "high" }) {
+const styles: Record<string, string> = {
+  critical: "bg-[#2a0d0c] text-[#ffd9d6]",
+  high: "bg-[#fbeae9] text-[#9f2f2d]",
+  medium: "bg-[#fbf3db] text-[#956400]",
+  low: "bg-[#ecf3ec] text-[#346538]",
+};
+
+export function RiskBadge({ severity }: { severity: "low" | "medium" | "high" | "critical" }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
-        severity === "high" && "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-        severity === "medium" && "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-        severity === "low" && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide",
+        styles[severity],
       )}
     >
-      <AlertTriangle className="h-3 w-3" />
+      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
       {severity}
     </span>
   );

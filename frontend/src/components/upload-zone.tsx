@@ -8,12 +8,16 @@ export function UploadZone({
   uploading: boolean;
 }) {
   return (
-    <label className="group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/40 p-10 text-center transition hover:border-blue-400 hover:bg-blue-50 dark:border-blue-900/60 dark:bg-blue-950/20">
-      <UploadCloud className="mb-3 h-8 w-8 text-blue-600" />
-      <p className="font-semibold text-slate-900 dark:text-slate-100">
-        {uploading ? "Uploading contract..." : "Drop your contract here or click to browse"}
+    <label className="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d6d3cc] bg-[#fcfbf9] p-12 text-center transition-colors duration-200 hover:border-[#0c0b0a] hover:bg-[#f6f4ef]">
+      <span className="mb-4 grid h-12 w-12 place-items-center rounded-lg border border-[#e8e6e1] bg-white text-[#161513] transition-colors duration-200 group-hover:border-[#0c0b0a] group-hover:bg-[#0c0b0a] group-hover:text-white">
+        <UploadCloud className="h-5 w-5" strokeWidth={1.6} />
+      </span>
+      <p className="font-semibold text-[#161513]">
+        {uploading ? "Uploading contract..." : "Drop your contract here, or click to browse"}
       </p>
-      <p className="mt-1 text-sm text-slate-500">Supports PDF, DOCX, JPG, PNG</p>
+      <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-[#a8a39a]">
+        PDF · DOCX · JPG · PNG
+      </p>
       <input
         type="file"
         name="file"

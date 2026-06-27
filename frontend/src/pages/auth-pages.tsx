@@ -1,12 +1,9 @@
 import {
-  CheckCircle2,
   Eye,
   EyeOff,
   Fingerprint,
   FileWarning,
-  LockKeyhole,
   Scale,
-  Shield,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -18,7 +15,9 @@ import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
 import type { User } from "../lib/types";
 
-function GlowInput({
+const ease = [0.16, 1, 0.3, 1] as const;
+
+function Field({
   name,
   label,
   type = "text",
@@ -32,102 +31,133 @@ function GlowInput({
   rightSlot?: React.ReactNode;
 }) {
   return (
-    <label className="group relative block">
-      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{label}</span>
-      <input
-        name={name}
-        type={type}
-        required={required}
-        placeholder={`Enter ${label.toLowerCase()}`}
-        className="h-12 w-full rounded-2xl border border-white/20 bg-white/10 px-4 pr-11 text-sm text-slate-100 shadow-[0_8px_20px_rgba(15,23,42,0.35)] outline-none backdrop-blur transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/20 placeholder:text-slate-400"
-      />
-      {rightSlot ? <div className="absolute right-3 top-[35px] text-slate-400">{rightSlot}</div> : null}
+    <label className="block">
+      <span className="mb-2 block font-mono text-[11px] uppercase tracking-[0.16em] text-[#78736b]">
+        {label}
+      </span>
+      <div className="relative">
+        <input
+          name={name}
+          type={type}
+          required={required}
+          placeholder={`Enter ${label.toLowerCase()}`}
+          className="h-12 w-full rounded-md border border-[#e8e6e1] bg-white px-3.5 pr-11 text-sm text-[#161513] outline-none transition-all placeholder:text-[#a8a39a] focus:border-[#0c0b0a] focus:ring-2 focus:ring-[#161513]/10"
+        />
+        {rightSlot ? (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[#78736b]">{rightSlot}</div>
+        ) : null}
+      </div>
     </label>
   );
 }
 
+const severityRow: Record<string, string> = {
+  high: "border-[#f4d9d7] bg-[#fbeae9] text-[#9f2f2d]",
+  medium: "border-[#f0e4c4] bg-[#fbf3db] text-[#956400]",
+  low: "border-[#d9e6d9] bg-[#ecf3ec] text-[#346538]",
+};
+
 function AuthLayout({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <div className="grid min-h-screen bg-[#040816] text-white lg:grid-cols-2">
-      <div className="relative overflow-hidden border-b border-slate-800 p-8 lg:border-b-0 lg:border-r lg:p-12">
-        <div className="absolute inset-0 opacity-80 [background:radial-gradient(circle_at_20%_20%,rgba(37,99,235,0.24),transparent_35%),radial-gradient(circle_at_70%_30%,rgba(99,102,241,0.2),transparent_40%),radial-gradient(circle_at_50%_90%,rgba(14,165,233,0.18),transparent_35%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:38px_38px]" />
-        <div className="absolute inset-0 [mask-image:radial-gradient(circle_at_center,black,transparent_75%)] bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22 viewBox=%220 0 80 80%22%3E%3Cg fill=%22none%22 stroke=%22rgba(148,163,184,0.12)%22 stroke-width=%220.5%22%3E%3Ccircle cx=%2240%22 cy=%2240%22 r=%2232%22/%3E%3C/g%3E%3C/svg%3E')]" />
+    <div className="grid min-h-screen bg-[#fbfbfa] text-[#3a3a37] lg:grid-cols-2">
+      {/* Brand panel */}
+      <div className="relative hidden overflow-hidden border-r border-[#e8e6e1] bg-[#f7f6f3] p-12 lg:block">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-60 [background:radial-gradient(50%_40%_at_15%_0%,rgba(150,100,0,0.05),transparent_60%),radial-gradient(50%_40%_at_100%_10%,rgba(31,108,159,0.05),transparent_55%)]"
+        />
+        <div className="relative z-10 flex h-full flex-col">
+          <Link to="/" className="flex items-center gap-2.5">
+            <span className="grid h-8 w-8 place-items-center rounded-md bg-[#0c0b0a] text-white">
+              <Scale className="h-4 w-4" strokeWidth={1.75} />
+            </span>
+            <span className="text-[15px] font-semibold tracking-tight text-[#161513]">Legalyze</span>
+          </Link>
 
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs backdrop-blur">
-            <Shield className="h-3.5 w-3.5 text-blue-300" />
-            Enterprise-grade legal intelligence
-          </div>
-          <h2 className="mt-6 text-4xl font-bold leading-tight tracking-tight lg:text-5xl">
-            AI-native legal analysis.
-            <br />
-            Designed for trust.
-          </h2>
-          <p className="mt-3 max-w-lg text-slate-300">
-            Clause-level risk visibility, contract intelligence, and legal copiloting in a premium secure workspace.
-          </p>
+          <div className="mt-auto">
+            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-[#a8a39a]">
+              Indian legal intelligence
+            </p>
+            <h2 className="mt-5 font-serif text-4xl font-medium leading-[1.1] tracking-[-0.02em] text-[#0c0b0a] xl:text-5xl">
+              Understand contracts
+              <br />
+              <span className="italic text-[#5b574f]">before</span> you sign.
+            </h2>
+            <p className="mt-5 max-w-md text-[15px] leading-relaxed text-[#5b574f]">
+              Clause-level risk visibility, contract intelligence, and a legal copilot — in one calm,
+              private workspace.
+            </p>
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-2">
-            {([
-              ["Risk Detection", FileWarning],
-              ["Clause Analysis", Scale],
-              ["AI Legal Assistant", Sparkles],
-              ["Contract Intelligence", Fingerprint],
-            ] satisfies [string, LucideIcon][]).map(([titleText, Icon], idx) => (
-              <motion.div
-                key={titleText}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + idx * 0.05 }}
-                whileHover={{ y: -2 }}
-                className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur"
-              >
-                <div className="mb-2 inline-flex rounded-lg bg-blue-500/20 p-1.5">
-                  <Icon className="h-4 w-4 text-blue-300" />
-                </div>
-                <p className="text-sm font-semibold">{titleText}</p>
-              </motion.div>
-            ))}
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {["End-to-end encrypted", "GDPR compliant", "Enterprise-ready"].map((badge) => (
-              <span key={badge} className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
-                <CheckCircle2 className="h-3 w-3 text-emerald-300" />
-                {badge}
-              </span>
-            ))}
+            <div className="mt-8 grid max-w-md gap-3 sm:grid-cols-2">
+              {([
+                ["Risk detection", FileWarning],
+                ["Clause analysis", Scale],
+                ["AI legal assistant", Sparkles],
+                ["Contract intelligence", Fingerprint],
+              ] satisfies [string, LucideIcon][]).map(([titleText, Icon], idx) => (
+                <motion.div
+                  key={titleText}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease, delay: 0.1 + idx * 0.06 }}
+                  className="rounded-lg border border-[#e8e6e1] bg-white p-4"
+                >
+                  <span className="mb-2.5 inline-grid h-9 w-9 place-items-center rounded-md border border-[#e8e6e1] bg-[#fbfbfa] text-[#161513]">
+                    <Icon className="h-4 w-4" strokeWidth={1.6} />
+                  </span>
+                  <p className="text-sm font-semibold text-[#161513]">{titleText}</p>
+                </motion.div>
+              ))}
+            </div>
           </div>
 
           <motion.div
             animate={{ y: [0, -6, 0] }}
-            transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-            className="mt-7 max-w-md rounded-3xl border border-white/20 bg-[#0b1226]/80 p-4 shadow-[0_20px_50px_rgba(30,64,175,0.25)] backdrop-blur"
+            transition={{ repeat: Infinity, duration: 7, ease: "easeInOut" }}
+            className="mt-10 max-w-md rounded-xl border border-[#e8e6e1] bg-white p-4 shadow-[0_18px_48px_rgba(12,11,10,0.06)]"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Contract preview</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#a8a39a]">
+              Contract preview
+            </p>
             <div className="mt-3 space-y-2 text-sm">
-              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-red-200">Termination: unilateral without notice</div>
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-amber-200">Liability: uncapped indemnity exposure</div>
-              <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-2 text-blue-200">AI insight: Risk score 84% (High)</div>
+              {([
+                ["high", "Termination: unilateral without notice"],
+                ["medium", "Liability: uncapped indemnity exposure"],
+                ["low", "Confidentiality survives indefinitely"],
+              ] as const).map(([level, text]) => (
+                <div key={text} className={`rounded-lg border p-2.5 ${severityRow[level]}`}>
+                  {text}
+                </div>
+              ))}
             </div>
           </motion.div>
         </div>
       </div>
 
-      <div className="grid place-items-center p-5 lg:p-10">
+      {/* Form panel */}
+      <div className="grid place-items-center p-6 lg:p-10">
         <motion.div
-          initial={{ opacity: 0, y: 14, filter: "blur(8px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          className="w-full max-w-md rounded-[28px] border border-white/15 bg-white/10 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.45),0_0_0_1px_rgba(99,102,241,0.25)] backdrop-blur-xl"
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease }}
+          className="w-full max-w-md"
         >
-          <div className="mb-5">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
-              <LockKeyhole className="h-3.5 w-3.5 text-blue-300" />
-              Secure sign-in
-            </div>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight">{title}</h1>
-            <p className="mt-1 text-sm text-slate-300">{subtitle}</p>
+          <div className="mb-7">
+            <Link
+              to="/"
+              className="mb-6 inline-flex items-center gap-2.5 lg:hidden"
+            >
+              <span className="grid h-8 w-8 place-items-center rounded-md bg-[#0c0b0a] text-white">
+                <Scale className="h-4 w-4" strokeWidth={1.75} />
+              </span>
+              <span className="text-[15px] font-semibold tracking-tight text-[#161513]">Legalyze</span>
+            </Link>
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#a8a39a]">
+              {subtitle}
+            </p>
+            <h1 className="mt-3 font-serif text-4xl font-medium tracking-[-0.02em] text-[#0c0b0a]">
+              {title}
+            </h1>
           </div>
           {children}
         </motion.div>
@@ -152,26 +182,27 @@ export function LoginPage({ onLogin }: { onLogin: (u: User) => void }) {
     nav("/app/dashboard");
   }
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to your legal workspace">
+    <AuthLayout title="Welcome back" subtitle="Sign in to your workspace">
       <form onSubmit={submit} className="space-y-4">
-        <GlowInput name="email" label="Email" />
-        <GlowInput
+        <Field name="email" label="Email" type="email" />
+        <Field
           name="password"
           label="Password"
           type={show ? "text" : "password"}
           rightSlot={
-            <button type="button" onClick={() => setShow((v) => !v)}>
-              {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            <button type="button" aria-label={show ? "Hide password" : "Show password"} onClick={() => setShow((v) => !v)}>
+              {show ? <EyeOff className="h-4 w-4" strokeWidth={1.75} /> : <Eye className="h-4 w-4" strokeWidth={1.75} />}
             </button>
           }
         />
-        <Button className="h-12 w-full rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 text-sm font-semibold shadow-[0_10px_30px_rgba(37,99,235,0.4)] hover:scale-[1.02]">
-          Login
-        </Button>
+        <Button className="h-12 w-full">Log in</Button>
       </form>
-      <div className="mt-5 rounded-2xl border border-white/15 bg-white/5 p-3 text-center text-sm text-slate-300">
-        No account? <Link to="/register" className="font-semibold text-blue-300">Create one</Link>
-      </div>
+      <p className="mt-6 text-center text-sm text-[#78736b]">
+        No account?{" "}
+        <Link to="/register" className="font-semibold text-[#0c0b0a] underline underline-offset-4">
+          Create one
+        </Link>
+      </p>
     </AuthLayout>
   );
 }
@@ -200,28 +231,29 @@ export function RegisterPage({ onLogin }: { onLogin: (u: User) => void }) {
     nav("/app/dashboard");
   }
   return (
-    <AuthLayout title="Create account" subtitle="Start analyzing contracts with confidence">
+    <AuthLayout title="Create account" subtitle="Start analyzing contracts">
       <form onSubmit={submit} className="space-y-4">
-        <GlowInput name="name" label="Full name" />
-        <GlowInput name="email" label="Email" />
-        <GlowInput
+        <Field name="name" label="Full name" />
+        <Field name="email" label="Email" type="email" />
+        <Field
           name="password"
           label="Password"
           type={show ? "text" : "password"}
           rightSlot={
-            <button type="button" onClick={() => setShow((v) => !v)}>
-              {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            <button type="button" aria-label={show ? "Hide password" : "Show password"} onClick={() => setShow((v) => !v)}>
+              {show ? <EyeOff className="h-4 w-4" strokeWidth={1.75} /> : <Eye className="h-4 w-4" strokeWidth={1.75} />}
             </button>
           }
         />
-        <GlowInput name="confirm" label="Confirm password" type={show ? "text" : "password"} />
-        <Button className="h-12 w-full rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 text-sm font-semibold shadow-[0_10px_30px_rgba(37,99,235,0.4)] hover:scale-[1.02]">
-          Create account
-        </Button>
+        <Field name="confirm" label="Confirm password" type={show ? "text" : "password"} />
+        <Button className="h-12 w-full">Create account</Button>
       </form>
-      <div className="mt-5 rounded-2xl border border-white/15 bg-white/5 p-3 text-center text-sm text-slate-300">
-        Already have an account? <Link to="/login" className="font-semibold text-blue-300">Sign in</Link>
-      </div>
+      <p className="mt-6 text-center text-sm text-[#78736b]">
+        Already have an account?{" "}
+        <Link to="/login" className="font-semibold text-[#0c0b0a] underline underline-offset-4">
+          Sign in
+        </Link>
+      </p>
     </AuthLayout>
   );
 }

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.core.deps import get_current_user_id, get_db
 from app.schemas.legal import DocumentResponse
-from app.services.ai_service import ai_service
+from app.services.ai_service import SEVERITY_SCORE, ai_service
 from app.services.document_service import document_service
 from app.services.rag_service import rag_service
 
@@ -102,9 +102,10 @@ async def analyze_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     await db.documents.update_one({"_id": doc["_id"]}, {"$set": {"analysis_status": "processing"}})
-    clauses = await ai_service.extract_clauses(doc.get("extracted_text", ""))
-    risks = await ai_service.detect_risks(clauses, doc.get("extracted_text", ""))
-    summary = await ai_service.summarize_contract(doc.get("extracted_text", ""))
+    analysis = await ai_service.analyze_contract(doc.get("extracted_text", ""))
+    clauses = analysis["clauses"]
+    risks = analysis["risks"]
+    summary = analysis["summary"]
     await db.clauses.delete_many({"document_id": document_id})
     await db.risks.delete_many({"document_id": document_id})
     await db.summaries.delete_many({"document_id": document_id})
@@ -125,7 +126,7 @@ async def analyze_document(
     risk_score = 0
     for r in risks:
         severity = r["severity"]
-        risk_score += 80 if severity == "high" else 50 if severity == "medium" else 20
+        risk_score += SEVERITY_SCORE.get(severity, 50)
         await db.risks.insert_one(
             {
                 "document_id": document_id,
@@ -141,7 +142,13 @@ async def analyze_document(
         )
 
     await db.summaries.insert_one(
-        {"document_id": document_id, **summary, "created_at": datetime.now(timezone.utc)}
+        {
+            "document_id": document_id,
+            **summary,
+            "contract_type": analysis.get("contract_type"),
+            "overall_risk_level": analysis.get("overall_risk_level"),
+            "created_at": datetime.now(timezone.utc),
+        }
     )
     await db.documents.update_one(
         {"_id": doc["_id"]},

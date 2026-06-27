@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+import json
 import logging
 import asyncio
 import re
@@ -6,6 +7,9 @@ import re
 import httpx
 
 from app.core.config import settings
+
+VALID_SEVERITY = {"low", "medium", "high", "critical"}
+SEVERITY_SCORE = {"low": 20, "medium": 50, "high": 80, "critical": 100}
 
 CLAUSE_KEYWORDS: dict[str, list[str]] = {
     "payment": ["payment", "fees", "invoice", "consideration"],
@@ -61,6 +65,70 @@ class AIService:
                     self.logger.warning("Gemini call failed (%s); using fallback.", str(exc))
                     return None
         return None
+
+    async def _call_gemini_json(self, prompt: str) -> dict | None:
+        """Call Gemini in JSON mode and return a parsed dict, or None on failure."""
+        if not settings.gemini_api_key:
+            self.logger.warning("Gemini API key missing; using fallback analysis.")
+            return None
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
+        )
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"response_mime_type": "application/json", "temperature": 0.2},
+        }
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            for attempt in range(2):
+                try:
+                    response = await client.post(url, json=payload)
+                    response.raise_for_status()
+                    data = response.json()
+                    candidates = data.get("candidates", [])
+                    if not candidates:
+                        self.logger.warning("Gemini returned no candidates; using fallback.")
+                        return None
+                    raw = candidates[0]["content"]["parts"][0].get("text", "")
+                    return self._parse_json_block(raw)
+                except httpx.HTTPStatusError as exc:
+                    status_code = exc.response.status_code
+                    self.logger.warning(
+                        "Gemini analysis HTTP error %s on attempt %s; model=%s",
+                        status_code,
+                        attempt + 1,
+                        settings.gemini_model,
+                    )
+                    if status_code in {429, 500, 502, 503, 504} and attempt == 0:
+                        await asyncio.sleep(0.8)
+                        continue
+                    return None
+                except Exception as exc:
+                    self.logger.warning("Gemini analysis failed (%s); using fallback.", str(exc))
+                    return None
+        return None
+
+    @staticmethod
+    def _parse_json_block(raw: str) -> dict | None:
+        """Parse a JSON object from model output, tolerating markdown code fences."""
+        if not raw:
+            return None
+        text = raw.strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?\s*", "", text)
+            text = re.sub(r"\s*```$", "", text)
+        try:
+            parsed = json.loads(text)
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            start, end = text.find("{"), text.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                try:
+                    parsed = json.loads(text[start : end + 1])
+                    return parsed if isinstance(parsed, dict) else None
+                except json.JSONDecodeError:
+                    return None
+            return None
 
     @staticmethod
     def _split_sentences(text: str) -> list[str]:
@@ -293,26 +361,190 @@ class AIService:
             "key_risks": ["Potential one-sided obligations", "Review indemnity and liability caps"],
         }
 
+    @staticmethod
+    def _norm_severity(value: object, default: str = "medium") -> str:
+        v = str(value or "").strip().lower()
+        if v in {"moderate"}:
+            return "medium"
+        return v if v in VALID_SEVERITY else default
+
+    @staticmethod
+    def _as_str_list(value: object, limit: int = 8) -> list[str]:
+        if isinstance(value, list):
+            return [str(x).strip() for x in value if str(x).strip()][:limit]
+        if isinstance(value, str) and value.strip():
+            return [value.strip()]
+        return []
+
+    def _build_analysis_prompt(self, text: str) -> str:
+        return (
+            "You are an expert contract review and risk-assessment engine specialised in INDIAN law "
+            "(Indian Contract Act 1872, and other applicable Indian statutes such as labour, IT/data, "
+            "stamp, and arbitration laws). Identify, classify, and explain contractual obligations, "
+            "rights, restrictions, liabilities, and risks.\n\n"
+            "PRINCIPLES:\n"
+            "- Analyse every clause, schedule, and annexure. Do not assume a clause is safe just because "
+            "it is common. Evaluate the actual language, not just headings.\n"
+            "- Treat every clause as a potential source of risk; if a clause has multiple risks, list each "
+            "separately. Continue until the whole document is reviewed.\n"
+            "- Review for financial, liability, termination, employment, intellectual-property, "
+            "privacy/data, operational, legal/regulatory, and renewal/duration risks, and overall fairness.\n"
+            "- Ground reasoning in Indian law where relevant. Provide educational guidance, not formal legal advice.\n\n"
+            "SEVERITY: use only one of low | medium | high | critical.\n"
+            "  low = minor administrative/operational risk.\n"
+            "  medium = noticeable legal/operational/financial risk.\n"
+            "  high = significant legal/financial/privacy/employment/liability exposure.\n"
+            "  critical = could cause major loss, loss of rights, regulatory exposure, litigation, "
+            "ownership transfer, or unlimited liability.\n\n"
+            "Return ONLY a valid JSON object with EXACTLY this shape (no markdown, no commentary):\n"
+            "{\n"
+            '  "contract_type": "short label, e.g. Employment Agreement",\n'
+            '  "overall_risk_level": "low | moderate | high | critical",\n'
+            '  "summary": {\n'
+            '    "plain_summary": "2-4 sentence plain-language overview",\n'
+            '    "obligations": ["key obligations"],\n'
+            '    "deadlines": ["time-bound duties / notice periods"],\n'
+            '    "payment_terms": ["payment / fee terms"],\n'
+            '    "termination_conditions": ["termination triggers"],\n'
+            '    "key_risks": ["the most important risks in plain language"]\n'
+            "  },\n"
+            '  "clauses": [\n'
+            '    {"clause_type": "snake_case type e.g. termination, indemnity, non_compete, data_privacy",\n'
+            '     "content": "the actual clause text or close paraphrase",\n'
+            '     "explanation": "plain-language meaning under Indian law",\n'
+            '     "risk_level": "low | medium | high | critical"}\n'
+            "  ],\n"
+            '  "risks": [\n'
+            '    {"clause_type": "snake_case type",\n'
+            '     "severity": "low | medium | high | critical",\n'
+            '     "issue": "short risk title",\n'
+            '     "risky_text": "the specific risky wording",\n'
+            '     "why_risky": "why this is a risk (cite Indian-law angle if relevant)",\n'
+            '     "recommendation": "safer alternative wording / action"}\n'
+            "  ]\n"
+            "}\n\n"
+            "If the document has no extractable text, return empty arrays and say so in plain_summary.\n\n"
+            f"CONTRACT TEXT:\n{text[:14000]}"
+        )
+
+    def _normalize_analysis(self, data: dict) -> dict:
+        raw_summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+        summary = {
+            "plain_summary": str(raw_summary.get("plain_summary") or "No summary generated.").strip(),
+            "obligations": self._as_str_list(raw_summary.get("obligations")),
+            "deadlines": self._as_str_list(raw_summary.get("deadlines")),
+            "payment_terms": self._as_str_list(raw_summary.get("payment_terms")),
+            "termination_conditions": self._as_str_list(raw_summary.get("termination_conditions")),
+            "key_risks": self._as_str_list(raw_summary.get("key_risks")),
+        }
+
+        clauses: list[dict] = []
+        for c in data.get("clauses", []) if isinstance(data.get("clauses"), list) else []:
+            if not isinstance(c, dict):
+                continue
+            content = str(c.get("content") or "").strip()
+            if not content:
+                continue
+            ctype = str(c.get("clause_type") or "general").strip().lower().replace(" ", "_") or "general"
+            clauses.append(
+                {
+                    "clause_type": ctype,
+                    "content": content[:2000],
+                    "explanation": str(c.get("explanation") or "").strip()[:1500]
+                    or f"This is a {ctype.replace('_', ' ')} clause.",
+                    "risk_level": self._norm_severity(c.get("risk_level")),
+                }
+            )
+
+        risks: list[dict] = []
+        for r in data.get("risks", []) if isinstance(data.get("risks"), list) else []:
+            if not isinstance(r, dict):
+                continue
+            issue = str(r.get("issue") or "").strip()
+            if not issue:
+                continue
+            ctype = str(r.get("clause_type") or "general").strip().lower().replace(" ", "_") or "general"
+            risks.append(
+                {
+                    "clause_type": ctype,
+                    "severity": self._norm_severity(r.get("severity")),
+                    "issue": issue[:300],
+                    "risky_text": str(r.get("risky_text") or "").strip()[:2000],
+                    "why_risky": str(r.get("why_risky") or issue).strip()[:1500],
+                    "recommendation": str(r.get("recommendation") or "Seek legal review.").strip()[:1500],
+                }
+            )
+
+        contract_type = str(data.get("contract_type") or "").strip() or None
+        overall = self._norm_severity(data.get("overall_risk_level"), default="") or None
+        return {
+            "contract_type": contract_type,
+            "overall_risk_level": overall,
+            "summary": summary,
+            "clauses": clauses,
+            "risks": risks,
+        }
+
+    async def analyze_contract(self, text: str) -> dict:
+        """AI-driven contract analysis with graceful fallback to rule-based heuristics."""
+        self.logger.info("Contract analysis requested. Gemini enabled: %s", bool(settings.gemini_api_key))
+        if text and text.strip():
+            parsed = await self._call_gemini_json(self._build_analysis_prompt(text))
+            if parsed is not None:
+                result = self._normalize_analysis(parsed)
+                if result["clauses"] or result["risks"] or result["summary"]["plain_summary"]:
+                    return result
+            self.logger.warning("Falling back to rule-based contract analysis.")
+
+        clauses = await self.extract_clauses(text)
+        risks = await self.detect_risks(clauses, text)
+        summary = await self.summarize_contract(text)
+        return {
+            "contract_type": None,
+            "overall_risk_level": None,
+            "summary": summary,
+            "clauses": clauses,
+            "risks": risks,
+        }
+
     async def legal_chat(self, question: str, context: str) -> dict:
         self.logger.info(
             "Legal chat request received. Gemini enabled: %s",
             bool(settings.gemini_api_key),
         )
         has_context = bool(context.strip())
+        scope_rules = (
+            "You are Legalyze, a legal assistant. You must ONLY answer questions that are about "
+            "(a) the uploaded document context provided below, or (b) Indian law specifically "
+            "(statutes, acts, sections, case law, legal procedure, contracts, legal rights, and "
+            "obligations under Indian law).\n"
+            "Being merely about India is NOT enough. You MUST refuse general-knowledge questions about "
+            "India that are not legal, such as its capital, geography, history, population, politics, "
+            "economy, culture, sports, or famous people.\n"
+            "You MUST also refuse any other unrelated topic (chit-chat, coding, math, cooking, current "
+            "events, the law of other countries, etc.).\n"
+            "When you refuse, reply with exactly this sentence and nothing else: "
+            "\"I can only help with questions about your uploaded document or Indian law. Please ask "
+            "something related to those.\"\n"
+            "Examples of questions you MUST refuse: \"What is the capital of India?\", \"Who is the PM "
+            "of India?\", \"Write me a poem.\", \"What is 2+2?\".\n"
+            "Examples of questions you may answer: \"What is Section 138 of the Negotiable Instruments "
+            "Act?\", \"What are my rights as a tenant under Indian law?\", \"Explain the indemnity "
+            "clause in my uploaded contract.\"\n"
+            "Do not invent facts. Provide concise educational guidance, not formal legal advice.\n\n"
+        )
         if has_context:
             prompt = (
-                "You are a legal assistant focused on Indian law. "
-                "Provide concise educational guidance, not legal advice. "
-                "Use uploaded context first. If context is insufficient, explicitly say so and then provide "
-                "a general Indian-law explanation.\n\n"
+                scope_rules
+                + "Use the uploaded context first. If the context is insufficient to answer a valid "
+                "Indian-law question, say so explicitly and then give a general Indian-law explanation.\n\n"
                 f"Uploaded Context:\n{context[:4000]}\n\nQuestion: {question}"
             )
         else:
             prompt = (
-                "You are a legal assistant focused on Indian law. "
-                "Provide concise educational guidance, not legal advice. "
-                "No uploaded document context is available, so answer from general legal knowledge of Indian law "
-                "in a practical plain-language way.\n\n"
+                scope_rules
+                + "No uploaded document context is available, so for valid questions answer from general "
+                "knowledge of Indian law in a practical, plain-language way.\n\n"
                 f"Question: {question}"
             )
         answer = await self._call_gemini(prompt)

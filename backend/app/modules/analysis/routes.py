@@ -62,6 +62,8 @@ async def get_summary(document_id: str, user_id: str = Depends(get_current_user_
     return SummaryResponse(
         id=str(summary["_id"]),
         document_id=summary["document_id"],
+        contract_type=summary.get("contract_type"),
+        overall_risk_level=summary.get("overall_risk_level"),
         plain_summary=summary["plain_summary"],
         obligations=summary["obligations"],
         deadlines=summary["deadlines"],

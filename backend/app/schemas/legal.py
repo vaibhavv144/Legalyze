@@ -15,7 +15,7 @@ ClauseType = Literal[
     "jurisdiction",
     "force_majeure",
 ]
-RiskSeverity = Literal["low", "medium", "high"]
+RiskSeverity = Literal["low", "medium", "high", "critical"]
 AnalysisStatus = Literal["uploaded", "processing", "completed", "failed"]
 
 
@@ -31,7 +31,7 @@ class DocumentResponse(BaseModel):
 class ClauseResponse(BaseModel):
     id: str
     document_id: str
-    clause_type: ClauseType
+    clause_type: str
     content: str
     explanation: str
     risk_level: RiskSeverity
@@ -52,6 +52,8 @@ class RiskResponse(BaseModel):
 class SummaryResponse(BaseModel):
     id: str
     document_id: str
+    contract_type: str | None = None
+    overall_risk_level: str | None = None
     plain_summary: str
     obligations: list[str]
     deadlines: list[str]
