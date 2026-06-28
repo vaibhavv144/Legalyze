@@ -10,10 +10,27 @@ import {
 import { motion } from "framer-motion";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { api } from "../lib/api";
 import type { User } from "../lib/types";
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  if (!axios.isAxiosError(error)) {
+    return error instanceof Error ? error.message : fallback;
+  }
+  const detail = error.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] as { msg?: string; loc?: string[] };
+    const field = first.loc?.slice(-1)[0];
+    const msg = first.msg ?? fallback;
+    return field ? `${field}: ${msg}` : msg;
+  }
+  return fallback;
+}
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -174,12 +191,16 @@ export function LoginPage({ onLogin }: { onLogin: (u: User) => void }) {
     const fd = new FormData(e.currentTarget);
     const email = String(fd.get("email"));
     const password = String(fd.get("password"));
-    const res = await api.post("/auth/login", { email, password });
-    localStorage.setItem("accessToken", res.data.access_token);
-    localStorage.setItem("refreshToken", res.data.refresh_token);
-    const me = await api.get<User>("/auth/me");
-    onLogin(me.data);
-    nav("/app/dashboard");
+    try {
+      const res = await api.post("/auth/login", { email, password });
+      localStorage.setItem("accessToken", res.data.access_token);
+      localStorage.setItem("refreshToken", res.data.refresh_token);
+      const me = await api.get<User>("/auth/me");
+      onLogin(me.data);
+      nav("/app/dashboard");
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Login failed. Check your email and password."));
+    }
   }
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to your workspace">
@@ -214,21 +235,38 @@ export function RegisterPage({ onLogin }: { onLogin: (u: User) => void }) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const payload = {
-      name: String(fd.get("name")),
-      email: String(fd.get("email")),
+      name: String(fd.get("name")).trim(),
+      email: String(fd.get("email")).trim(),
       password: String(fd.get("password")),
       confirm: String(fd.get("confirm")),
     };
-    if (payload.password !== payload.confirm) {
-      throw new Error("Passwords do not match");
+    if (payload.name.length < 2) {
+      toast.error("Full name must be at least 2 characters.");
+      return;
     }
-    await api.post("/auth/register", { name: payload.name, email: payload.email, password: payload.password });
-    const login = await api.post("/auth/login", { email: payload.email, password: payload.password });
-    localStorage.setItem("accessToken", login.data.access_token);
-    localStorage.setItem("refreshToken", login.data.refresh_token);
-    const me = await api.get<User>("/auth/me");
-    onLogin(me.data);
-    nav("/app/dashboard");
+    if (payload.password.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    if (payload.password !== payload.confirm) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+    try {
+      await api.post("/auth/register", {
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+      });
+      const login = await api.post("/auth/login", { email: payload.email, password: payload.password });
+      localStorage.setItem("accessToken", login.data.access_token);
+      localStorage.setItem("refreshToken", login.data.refresh_token);
+      const me = await api.get<User>("/auth/me");
+      onLogin(me.data);
+      nav("/app/dashboard");
+    } catch (error) {
+      toast.error(apiErrorMessage(error, "Registration failed. Please try again."));
+    }
   }
   return (
     <AuthLayout title="Create account" subtitle="Start analyzing contracts">
