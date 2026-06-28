@@ -5,7 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import "./index.css";
 import App from "./App";
-
+import { Analytics } from "@vercel/analytics/react";
 const queryClient = new QueryClient();
 
 createRoot(document.getElementById("root")!).render(
